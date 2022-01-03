@@ -7,29 +7,32 @@ using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using System.Net.Http;
+using PJAzureFunctions1.Domain;
+using PJAzureFunctions1.Helpers;
+using System.Net;
 
 namespace PJAzureFunctions1
 {
     public static class Function1
     {
-        [FunctionName("Function1")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req,
-            ILogger log)
+        [FunctionName("DeviceNotificationsRegistration")]
+        public static async Task<HttpResponseMessage> Run([HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "devicenotificationsregistrations/")] HttpRequestMessage req, ILogger log)
         {
-            log.LogInformation("C# HTTP trigger function processed a request.");
-
-            string name = req.Query["name"];
-
-            string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            dynamic data = JsonConvert.DeserializeObject(requestBody);
-            name = name ?? data?.name;
-
-            string responseMessage = string.IsNullOrEmpty(name)
-                ? "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response."
-                : $"Hello, {name}. This HTTP triggered function executed successfully.";
-
-            return new OkObjectResult(responseMessage);
+            try
+            {
+                log.LogInformation("New device registration incoming");
+                var content = await req.Content.ReadAsStringAsync();
+                DeviceInstallation deviceUpdate = await req.Content.ReadAsAsync<DeviceInstallation>();
+                await NotificationsHelper.RegisterDevice(deviceUpdate, log);
+                log.LogInformation("New device registered");
+                return req.CreateResponse(HttpStatusCode.OK);
+            }
+            catch (Exception ex)
+            {
+                log.LogInformation($"Error during device registration: {ex.Message}");
+            }
+            return req.CreateErrorResponse(HttpStatusCode.InternalServerError, "Error during device registration");
         }
     }
 }
